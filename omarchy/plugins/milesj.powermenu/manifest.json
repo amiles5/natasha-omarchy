@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "milesj.powermenu",
+  "name": "Power Menu",
+  "version": "1.0.0",
+  "author": "milesj",
+  "license": "MIT",
+  "description": "Lock, suspend, logout, reboot, shutdown - opens Omarchy's existing system menu.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Power Menu",
+    "description": "Lock / suspend / logout / reboot / shutdown",
+    "category": "System",
+    "allowMultiple": false
+  }
+}
