@@ -2,5 +2,6 @@
 # broader ~/.config tree. Everything else is ignored by default.
 /*
 !/.gitignore
+!/README.md
 !/hypr/
 !/omarchy/
