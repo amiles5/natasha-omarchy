@@ -1,0 +1,6 @@
+# This repo tracks only Omarchy-related config (hypr + omarchy) out of the
+# broader ~/.config tree. Everything else is ignored by default.
+/*
+!/.gitignore
+!/hypr/
+!/omarchy/
