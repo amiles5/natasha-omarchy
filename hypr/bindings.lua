@@ -28,4 +28,6 @@
 -- o.bind("SUPER + H", nil, "voxtype record toggle")
 -- o.bind("SUPER + PERIOD", nil, "omarchy-shell shell toggle omarchy.emojis")
 
+-- Was: Editor (default text editor, via { omarchy = "editor" })
+hl.unbind("SUPER + SHIFT + N")
 o.bind("SUPER + SHIFT + N", "Joplin", { launch = "joplin-desktop" })
