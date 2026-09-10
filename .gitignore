@@ -6,3 +6,7 @@
 !/KEYBINDINGS.md
 !/hypr/
 !/omarchy/
+!/systemd/
+systemd/user/*
+!systemd/user/random-wallpaper.service
+!systemd/user/random-wallpaper.timer

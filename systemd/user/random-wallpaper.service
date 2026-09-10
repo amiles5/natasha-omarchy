@@ -1,0 +1,6 @@
+[Unit]
+Description=Set a random desktop wallpaper from ~/Pictures/wallpapers
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/omarchy-random-wallpaper
