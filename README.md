@@ -78,3 +78,57 @@ ask was "duck if any other audio is playing."
 
 Room grouping and Sonos Favourites, both present in the `ayana-cachyos`
 Noctalia panel, aren't in the Omarchy version yet.
+
+## Windows VM (`omarchy-windows-vm`)
+
+### The recurring `~/Windows` permission bug
+
+Every time the VM actually runs — even after a perfectly clean
+`omarchy-windows-vm stop` — its own shared-folder setup leaves `~/Windows`
+(the shared-folder bind-mount source) at mode `2777` with a setgid bit.
+`chmod` cannot clear that setgid bit once it's been set (confirmed by
+testing outside the container too — it's a filesystem/directory-level
+quirk, not something Docker-specific). The packaged script's own
+`assert_mounts_safe` check then refuses the *next* `launch`/`remove` until
+that directory is back to exactly `700`, failing with either "failed to
+start" or (on `remove`) `Windows VM removal stopped before user-side
+cleanup`.
+
+Manual fix, when it recurs and the directory is confirmed empty:
+
+```bash
+mountpoint -q /var/lib/omarchy/windows/mounts/users/$(id -u)/shared &&
+  pkexec umount /var/lib/omarchy/windows/mounts/users/$(id -u)/shared
+rmdir ~/Windows && mkdir -m 0700 ~/Windows
+```
+
+### The self-healing wrapper
+
+`~/.local/bin/omarchy-windows-vm-safe` (not tracked in this repo — lives
+outside `~/.config`) wraps the packaged binary: before delegating, it
+checks whether `~/Windows` needs fixing and, if so and it's safe to
+(VM not currently up, directory confirmed empty first — it will never
+delete real files), does the rmdir/mkdir dance above automatically.
+
+The "is the VM up" check is a plain TCP probe against port 3389, not
+`docker inspect` — this wrapper runs from a non-interactive desktop
+launcher as often as a terminal, and a privileged call that stalls on an
+unanswerable password/polkit prompt must never hang the launch.
+
+Wired into both real invocation paths:
+- `~/.local/share/applications/windows-vm.desktop`'s `Exec=` points at the
+  wrapper (this file is regenerated if `omarchy-windows-vm install` is
+  ever rerun after being removed — repoint it again if so).
+- `~/.bashrc` defines an `omarchy-windows-vm` shell function that calls the
+  wrapper, shadowing the packaged binary for interactive/CLI use (`.bashrc`
+  is not tracked in this repo either).
+
+### Verified lifecycle (2026-09-11)
+
+Startup (resumes the existing disk, no reinstall), clean `stop`, and RDP
+login (`xfreerdp3`, full session with graphics/input/sound channels) all
+confirmed working end-to-end. One caveat worth remembering: interrupting
+Windows Setup mid-install (e.g. killing the launch process before it
+finishes) forces the *next* launch to rebuild the ~64GB disk from scratch
+rather than resuming — let a fresh install run to completion (15-30+ min)
+before stopping it.
