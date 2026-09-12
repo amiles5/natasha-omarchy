@@ -31,3 +31,9 @@
 -- Was: Editor (default text editor, via { omarchy = "editor" })
 hl.unbind("SUPER + SHIFT + N")
 o.bind("SUPER + SHIFT + N", "Joplin", { launch = "joplin-desktop" })
+
+-- Was: Google Photos (default web app, via { webapp = "https://photos.google.com/" })
+-- Ref: amiles5/ayana-cachyos (io.github.TaylanTatli.iCloud-Linux flatpak was
+-- the original there, but it's no longer on Flathub - using the web app instead).
+hl.unbind("SUPER + SHIFT + P")
+o.bind("SUPER + SHIFT + P", "iCloud Photos", { webapp = "https://www.icloud.com/photos/", focus = true })

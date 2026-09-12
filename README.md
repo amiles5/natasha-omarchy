@@ -132,3 +132,52 @@ Windows Setup mid-install (e.g. killing the launch process before it
 finishes) forces the *next* launch to rebuild the ~64GB disk from scratch
 rather than resuming — let a fresh install run to completion (15-30+ min)
 before stopping it.
+
+## GPU power widget (`milesj.gpupower`)
+
+Bar widget showing live power draw from the AMD dGPU's `hwmon` sensor
+(`power1_input`), with an adjustable live power cap (`power1_cap`):
+scroll on the icon for ±1W, right-click for a popup slider (5-40W). The
+`hwmon` number isn't assumed stable across reboots — both the poll and the
+write resolve the path fresh each time by scanning `/sys/class/drm/card*`
+for vendor `0x1002` (AMD).
+
+Cap changes are deliberately **not persisted** — plain sysfs write, resets
+to the 40W hardware default on every reboot.
+
+### GPU switching (Intel vs AMD) — not viable live
+
+The motivation was cutting power/heat by running on the Intel iGPU instead
+of the AMD dGPU. `apple_gmux` is loaded and does register with the kernel's
+`vga_switcheroo` (`/sys/kernel/debug/vgaswitcheroo/switch` lists both `IGD`
+and `DIS`), so the interface is real, not a dead stub. But both the delayed
+(`DDIGD`/queued-on-VT-switch) and immediate (`IGD`) switch commands were
+refused outright:
+
+```
+vga_switcheroo: client 101 refused switch
+```
+
+The AMD driver declines to hand off while it holds an active DRM master
+(Hyprland is actively rendering through it) — a deliberate safety check,
+not a crash. Tested safely: a `chvt 2` / `chvt 1` cycle to try to apply a
+queued switch caused no disruption, Hyprland/quickshell survived
+throughout. Separately, even if switching worked, the external Studio
+Display's DisplayPort is likely wired through the discrete GPU at the
+hardware level on this 2018 15" model (only the internal panel is
+mux-able) — so a successful switch might not even keep the external
+display alive. Given that, the power cap (above) is the actual lever for
+less heat/power, not GPU switching.
+
+### Local plugin hot-reload can go stale
+
+Hit while wiring up this widget's interactivity: repeated edits to a local
+plugin's `BarWidget.qml` logged `Local plugin changed, reloading: ...`
+each time, but the *live* bar widget kept rendering an old version
+regardless — confirmed by screenshotting the bar and seeing stale content
+after several edits. `omarchy restart shell` (a real restart, new
+quickshell PID) fixed it every time; the automatic hot-reload cannot be
+trusted as proof that an edit actually took effect. Worth reaching for a
+full restart whenever a local plugin change doesn't seem to do anything,
+rather than assuming the code itself is wrong.
+before stopping it.
