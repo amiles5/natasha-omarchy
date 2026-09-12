@@ -180,4 +180,21 @@ quickshell PID) fixed it every time; the automatic hot-reload cannot be
 trusted as proof that an edit actually took effect. Worth reaching for a
 full restart whenever a local plugin change doesn't seem to do anything,
 rather than assuming the code itself is wrong.
-before stopping it.
+
+### Incident: runaway power-cap write loop at boot (2026-09-12)
+
+An earlier version wired `writeProc.onExited: pollTimer.triggered()` to
+refresh the UI immediately after a cap write. Combined with the popup
+slider's `value: root.capWatts` binding, a poll-driven value update
+appears to have fired the slider's `onMoved` too (not just real drags) —
+write → poll → slider updates → `onMoved` → write → ... 31 unwanted
+`sudo tee power1_cap` writes fired in ~7 seconds right after boot,
+self-terminating once it happened to reach a fixed point at an
+unintended 10W (not the expected 40W default). Confirmed via
+`journalctl -b 0 | grep power1_cap` timestamps.
+
+Fixed two ways: dropped the immediate-refresh trigger entirely (the
+normal 2s poll is enough), and `setCap()` now refuses to write a value
+that already matches the current cap, so even a spurious `onMoved` firing
+is a no-op rather than a loop. Verified clean for 30+s post-restart with
+zero writes logged.

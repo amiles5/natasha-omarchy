@@ -35,8 +35,18 @@ BarWidget {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
+  // 2026-09-12 incident: this used to trigger an immediate poll refresh on
+  // write completion (writeProc.onExited: pollTimer.triggered()) for a
+  // snappier UI. That created a write -> poll -> slider.value updates ->
+  // PanelSlider fires onMoved on the programmatic change (not just real
+  // drag) -> setCap -> write -> ... feedback loop: 31 unwanted `sudo tee`
+  // writes in ~7s at boot, stabilizing on an unintended 10W cap. Fixed by
+  // (a) dropping the immediate-refresh trigger entirely - the normal 2s
+  // poll is plenty - and (b) refusing to write a value that's already the
+  // current cap, so even a spurious onMoved firing is a no-op.
   function setCap(watts) {
     var clamped = Math.max(minCapWatts, Math.min(capMaxWatts, Math.round(watts)))
+    if (clamped === Math.round(capWatts)) return
     var microwatts = clamped * 1000000
     writeProc.command = ["bash", "-c", resolveHwmon + " [ -n \"$hm\" ] && echo " + microwatts + " | sudo -n tee \"${hm}power1_cap\" >/dev/null"]
     writeProc.running = true
@@ -84,7 +94,6 @@ BarWidget {
 
   Process {
     id: writeProc
-    onExited: pollTimer.triggered()
   }
 
   Timer {
@@ -142,7 +151,11 @@ BarWidget {
           maximum: root.capMaxWatts
           step: 1
           value: root.capWatts
-          onMoved: function(v) { root.setCap(v) }
+          // Guard against PanelSlider firing onMoved from the programmatic
+          // "value: root.capWatts" binding (poll updates) rather than only
+          // real drag - popupOpen is the only time a value change here can
+          // legitimately be a user action. See setCap's incident note.
+          onMoved: function(v) { if (root.popupOpen) root.setCap(v) }
         }
 
         Text {
