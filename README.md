@@ -4,6 +4,31 @@ Omarchy/Hyprland config for `natasha` (MacBookPro15,1, T2 chip, dual GPU:
 Intel Coffee Lake iGPU + AMD Polaris11 dGPU). Tracks `hypr/` and `omarchy/`
 only — see `.gitignore`.
 
+## Random wallpaper rotation
+
+Desktop background rotates to a random image from `~/Pictures/wallpapers/`
+every 5 minutes, via a systemd user timer rather than any Omarchy-specific
+mechanism — Omarchy's own `theme bg next` only cycles backgrounds within
+the *current theme's* set, which isn't what "random from an arbitrary
+folder" needs. `theme bg set <path>` does take an arbitrary path though,
+so that's the actual integration point.
+
+- `~/.local/bin/omarchy-random-wallpaper` (not tracked here — lives
+  outside `~/.config`, same convention as the other `.local/bin` scripts)
+  — picks a random `.jpg`/`.jpeg`/`.png`/`.gif`/`.bmp`/`.webp` from that
+  folder and applies it with `omarchy theme bg set`. No-ops quietly
+  (exit 0, one line to stderr) if the folder's empty — never errors or
+  spams retries.
+- `systemd/user/random-wallpaper.{service,timer}` — `Type=oneshot` service
+  triggered by a timer: first run 30s after the timer starts (i.e.
+  ~login), then every 5 minutes (`OnUnitActiveSec=5min`). Enabled and
+  persists across reboots (`systemctl --user enable --now
+  random-wallpaper.timer`).
+
+Check it's running: `systemctl --user status random-wallpaper.timer`.
+Trigger one rotation immediately without waiting for the timer: run
+`omarchy-random-wallpaper` directly.
+
 ## Apple Studio Display
 
 ### The problem
