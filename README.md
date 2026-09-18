@@ -132,3 +132,27 @@ Windows Setup mid-install (e.g. killing the launch process before it
 finishes) forces the *next* launch to rebuild the ~64GB disk from scratch
 rather than resuming — let a fresh install run to completion (15-30+ min)
 before stopping it.
+
+## Syncing settings to another machine (`omarchy-sync-settings`)
+
+`~/.local/bin/omarchy-sync-settings` (not tracked here — lives outside
+`~/.config`) copies the current live state of `hypr/`, `omarchy/`, and the
+wallpaper-rotation systemd units to another machine over SSH/rsync —
+deliberately the exact same scope this repo tracks (see `.gitignore`), so
+there's one consistent definition of "Omarchy settings" rather than two
+that can drift apart.
+
+```bash
+omarchy-sync-settings <user@host-or-tailscale-name>              # additive/overwrite, safe default
+omarchy-sync-settings <user@host> --dry-run                      # preview only
+omarchy-sync-settings <user@host> --mirror                       # exact mirror, deletes target-only files
+```
+
+This repo is still the durable source of truth (commit/push here for a
+permanent record); the script is for actually propagating current state
+to a second machine over the network. It deliberately does **not** copy
+`~/.bashrc`, `omarchy-windows-vm-safe`, `omarchy-random-wallpaper`, or
+`windows-vm.desktop` — those are machine-specific enough (existing
+`.bashrc` content, whether the target even runs the Windows VM feature)
+that blindly overwriting them could do more harm than good; the script
+prints a reminder about these at the end.
