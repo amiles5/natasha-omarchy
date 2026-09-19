@@ -38,4 +38,6 @@ o.bind("SUPER + SHIFT + N", "Joplin", { launch = "joplin-desktop" })
 hl.unbind("SUPER + SHIFT + P")
 o.bind("SUPER + SHIFT + P", "iCloud Photos", { webapp = "https://www.icloud.com/photos/", focus = true })
 
-o.bind("SUPER + SHIFT + U", "Moneydance", { launch = "/home/milesj/moneydance/Moneydance" })
+-- Was: Docker (default web app)
+hl.unbind("SUPER + SHIFT + D")
+o.bind("SUPER + SHIFT + D", "Moneydance", { launch = "/home/milesj/moneydance/Moneydance" })
