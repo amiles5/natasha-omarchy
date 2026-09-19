@@ -104,6 +104,25 @@ ask was "duck if any other audio is playing."
 Room grouping and Sonos Favourites, both present in the `ayana-cachyos`
 Noctalia panel, aren't in the Omarchy version yet.
 
+### Sonos web app
+
+`SUPER + SHIFT + U` also opens the Sonos web app (`play.sonos.com`) as its
+own window, separate from the bar widget above — installed as a real
+Firefox PWA via `firefoxpwa` (matching how `ayana-cachyos` does WhatsApp
+and Sonos: `firefoxpwa site install <manifest-url>`, no hand-written
+manifest needed since the site publishes a real one). Pinned to
+workspace 6, same as `ayana-cachyos`.
+
+```bash
+firefoxpwa site install "https://play.sonos.com/manifest.webmanifest"
+firefoxpwa runtime install   # one-time, needed before any PWA will actually launch
+```
+
+The install generates a random site ID (`FFPWA-<ID>`) baked into both the
+keybinding (`hypr/bindings.lua`) and the workspace rule
+(`hypr/hyprland.lua`) — reinstalling the PWA generates a *different* ID,
+so both need updating to match if that ever happens.
+
 ## Windows VM (`omarchy-windows-vm`)
 
 ### The recurring `~/Windows` permission bug

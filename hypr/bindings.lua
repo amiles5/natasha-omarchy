@@ -41,3 +41,8 @@ o.bind("SUPER + SHIFT + P", "iCloud Photos", { webapp = "https://www.icloud.com/
 -- Was: Docker (default web app)
 hl.unbind("SUPER + SHIFT + D")
 o.bind("SUPER + SHIFT + D", "Moneydance", { launch = "/home/milesj/moneydance/Moneydance" })
+
+-- Sonos web app (play.sonos.com), installed as a real Firefox PWA via
+-- firefoxpwa - see natasha-omarchy README. Site ID is fixed at install
+-- time; reinstalling generates a new one and this must be updated to match.
+o.bind("SUPER + SHIFT + U", "Sonos", { launch = "firefoxpwa site launch 01M2X6JBSYM1EQA9QMQ3X4Q4RM" })
