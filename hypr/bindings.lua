@@ -37,3 +37,5 @@ o.bind("SUPER + SHIFT + N", "Joplin", { launch = "joplin-desktop" })
 -- the original there, but it's no longer on Flathub - using the web app instead).
 hl.unbind("SUPER + SHIFT + P")
 o.bind("SUPER + SHIFT + P", "iCloud Photos", { webapp = "https://www.icloud.com/photos/", focus = true })
+
+o.bind("SUPER + SHIFT + U", "Moneydance", { launch = "/home/milesj/moneydance/Moneydance" })
