@@ -4,6 +4,22 @@ Omarchy/Hyprland config for `natasha` (MacBookPro15,1, T2 chip, dual GPU:
 Intel Coffee Lake iGPU + AMD Polaris11 dGPU). Tracks `hypr/` and `omarchy/`
 only — see `.gitignore`.
 
+## Logitech mouse/keyboard battery
+
+`omarchy/bar/scripts/logitech-battery.py` — another plain `omarchy.bar`
+command module, ported from
+[amiles5/ayana-omarchy](https://github.com/amiles5/ayana-omarchy) (same
+Bolt receiver, actually — the MX Mechanical Mini keyboard and MX Master 3S
+mouse are paired to both machines as separate hosts on the one receiver).
+Shows both devices' battery % on the bar, click opens `solaar` (the GUI).
+
+Reads `solaar show all`'s plain text output (matched by each device's
+"Kind" — mouse/keyboard — rather than name, so a device swap doesn't need
+a code change; no machine-readable output mode exists). Each invocation
+re-walks the full HID++ feature set live over the radio — ~12s for both
+devices on this machine — which is why the poll interval is 120s, not the
+5s the Sonos widgets use.
+
 ## Random wallpaper rotation
 
 Desktop background rotates to a random image from `~/Pictures/wallpapers/`
