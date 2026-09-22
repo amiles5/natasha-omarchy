@@ -73,36 +73,58 @@ patching `toggleDisplay()`: re-enabling now runs
 `hyprctl keyword monitor DP-4,preferred,auto,auto && hyprctl reload` — the
 `hyprctl reload` immediately after reasserts `monitors.lua`'s forced mode.
 
-## Sonos bar widget (`milesj.sonos`)
+## Sonos bar widget + auto-duck
 
-Bar widget + background service for the local Sonos system, controlled
-directly over UPnP/SOAP (no cloud, no Sonos app). Ported from
-[amiles5/ayana-cachyos](https://github.com/amiles5/ayana-cachyos)'s
-Noctalia/Luau `sonos-control` plugin to Omarchy's QML plugin system — same
-physical speakers, same IP/RINCON table.
+Ported from [amiles5/ayana-omarchy](https://github.com/amiles5/ayana-omarchy)
+(same physical household speakers), replacing an earlier custom QML plugin
+(`milesj.sonos`) with the same simpler split that machine uses: a plain
+Omarchy `"type": "command"` bar module for the widget, and a standalone
+`systemd --user` service for ducking — decoupled from each other and from
+the bar's own process lifecycle.
 
-- `omarchy/plugins/milesj.sonos/Service.qml` — headless service, polls all
-  rooms every 5s (transport/title/volume/coordinator), owns all speaker
-  commands. `BarWidget.qml` never talks to the speakers directly.
-- `omarchy/plugins/milesj.sonos/BarWidget.qml` — icon + active room/track on
-  the bar. Click = play/pause, scroll = volume, right-click = popup to pick
-  the active room and adjust volume.
+- `hypr/scripts/sonos_lib.py` — shared UPnP/SOAP helpers (SOAP POST,
+  transport state, play/pause, group-coordinator discovery). Used by both
+  pieces below; not duplicated between them.
+- `omarchy/bar/scripts/sonos-status.py` / `sonos-toggle.py` — the bar
+  widget itself (`omarchy/shell.json`'s `"sonos"` command module, polled
+  every 5s). Status icon shows whether any group is playing; click is a
+  house-wide play/pause-all toggle. No room picker or volume control (a
+  real feature reduction from the old QML widget) — this matches
+  `ayana-omarchy`'s intentionally minimal version, not an oversight.
+- `hypr/scripts/sonos-ducking.sh` (a Python script despite the name, kept
+  for parity with `ayana-omarchy`) + `systemd/user/sonos-ducking.service`
+  — pauses every currently-playing group when the Studio Display's own
+  speakers start making sound, resumes only the groups it auto-paused once
+  the host goes quiet again.
 
-### Auto-duck
+### Why coordinator discovery, not a static room table
 
-Every 5s the service checks `pactl list sinks short` for any sink in
-`RUNNING` state — i.e. any audio actively playing on this host, from any
-output. If so, it pauses the active Sonos room; when host audio stops, it
-resumes only the room it auto-paused (and only if nothing else changed that
-room's transport in the meantime). This is a bit more general than the
-`ayana-cachyos` original, which only watched one specific sink (that
-machine's Studio Display speakers) — here it watches all sinks, since the
-ask was "duck if any other audio is playing."
+The old `milesj.sonos` plugin (and the `ayana-cachyos` original it was
+ported from) tracked one hardcoded `ROOMS` table of name/IP/RINCON. Two
+real problems with that: a speaker renamed in the Sonos app makes the
+hardcoded name go stale, and — discovered testing on this household's
+actual speakers (2026-09-21) — when speakers are grouped, only the
+*group's coordinator* accepts `Pause`/`Play`; other members reject it with
+an HTTP 500. `sonos_lib.discover_coordinators()` resolves the current
+topology live via `ZoneGroupTopology`'s `GetZoneGroupState` on every
+check instead, and only ever sends transport commands to a coordinator's
+own IP. Bootstrap IPs are still hardcoded (one of Bedroom/Dining/Kitchen/
+Living Room needs to be reachable to ask for the topology at all), but
+names and coordinator status are always read live, never assumed.
 
-### Not ported yet
+### Ducking specifics
 
-Room grouping and Sonos Favourites, both present in the `ayana-cachyos`
-Noctalia panel, aren't in the Omarchy version yet.
+Watches one specific sink — this Mac's Studio Display speakers
+(`alsa_output.usb-Apple_Inc._Studio_Display_...`) — not "any sink," unlike
+an earlier version of this ducking logic. Checked every 5s
+(`POLL_INTERVAL_SECONDS` in `sonos-ducking.sh`). On the sink going
+`RUNNING`, pauses every coordinator currently `PLAYING`. On it going quiet
+again, resumes only those same coordinators, and only if each is still
+`PAUSED_PLAYBACK` or `STOPPED` — if something else already changed a
+group's transport while the host was making noise, that group is left
+alone rather than force-resumed.
+
+Check it's running: `systemctl --user status sonos-ducking.service`.
 
 ### Sonos web app
 

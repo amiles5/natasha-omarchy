@@ -10,3 +10,7 @@
 systemd/user/*
 !systemd/user/random-wallpaper.service
 !systemd/user/random-wallpaper.timer
+!systemd/user/sonos-ducking.service
+
+# Python bytecode cache, wherever it lands under the tracked trees.
+__pycache__/

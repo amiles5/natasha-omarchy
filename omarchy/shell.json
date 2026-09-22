@@ -35,9 +35,6 @@
           "id": "omarchy.tray"
         },
         {
-          "id": "milesj.sonos"
-        },
-        {
           "id": "omarchy.tailscale"
         },
         {
@@ -48,6 +45,13 @@
         },
         {
           "id": "omarchy.network"
+        },
+        {
+          "id": "sonos",
+          "type": "command",
+          "exec": "~/.config/omarchy/bar/scripts/sonos-status.py",
+          "interval": 5,
+          "onClick": "~/.config/omarchy/bar/scripts/sonos-toggle.py"
         },
         {
           "id": "omarchy.audio"
