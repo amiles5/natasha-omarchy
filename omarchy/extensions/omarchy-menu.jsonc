@@ -26,5 +26,15 @@
   //
   // Example: replace the default About action by reusing the same id. Existing
   // fields are kept unless overridden.
+  //
+  // Route Windows VM install/remove through the self-healing wrapper
+  // (~/.local/bin/omarchy-windows-vm-safe - see natasha-omarchy README).
+  // The default actions run via `bash -c` through
+  // omarchy-launch-floating-terminal-with-presentation, which never sources
+  // .bashrc, so the interactive-shell function shadowing that covers
+  // typed-in-a-terminal use doesn't reach this path - the recurring
+  // ~/Windows setgid bug hit this exact gap once already (2026-09-22).
+  "install.windows": {"action":"omarchy-launch-floating-terminal-with-presentation '/home/milesj/.local/bin/omarchy-windows-vm-safe install'"},
+  "remove.windows": {"action":"omarchy-launch-floating-terminal-with-presentation '/home/milesj/.local/bin/omarchy-windows-vm-safe remove'"},
   // "about": {"icon":"","label":"About","action":"omarchy-launch-or-focus-tui \"zsh -c 'fastfetch; read -k 1'\""},
 }

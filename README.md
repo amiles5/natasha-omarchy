@@ -197,13 +197,21 @@ The "is the VM up" check is a plain TCP probe against port 3389, not
 launcher as often as a terminal, and a privileged call that stalls on an
 unanswerable password/polkit prompt must never hang the launch.
 
-Wired into both real invocation paths:
+Wired into every real invocation path:
 - `~/.local/share/applications/windows-vm.desktop`'s `Exec=` points at the
   wrapper (this file is regenerated if `omarchy-windows-vm install` is
   ever rerun after being removed — repoint it again if so).
 - `~/.bashrc` defines an `omarchy-windows-vm` shell function that calls the
   wrapper, shadowing the packaged binary for interactive/CLI use (`.bashrc`
   is not tracked in this repo either).
+- `omarchy/extensions/omarchy-menu.jsonc` overrides the `install.windows`
+  and `remove.windows` menu actions to call the wrapper directly. **Gap
+  found and fixed 2026-09-22**: those two menu actions run via
+  `omarchy-launch-floating-terminal-with-presentation`, which execs
+  `bash -c "..."` — a non-interactive shell that never sources `.bashrc`,
+  so the function-shadow trick above doesn't reach this path. Hit the
+  `~/Windows` setgid bug through exactly this gap once, confirming it
+  wasn't just theoretical.
 
 ### Verified lifecycle (2026-09-11)
 
