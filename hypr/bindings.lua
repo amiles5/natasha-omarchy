@@ -57,3 +57,12 @@ o.bind("SUPER + SHIFT + M", "Sonos", { launch = "firefoxpwa site launch 01M2X6JB
 hl.unbind("SUPER + SHIFT + C")
 o.bind("SUPER + SHIFT + C", "WhatsApp", { webapp = "https://web.whatsapp.com/", focus = true })
 hl.unbind("SUPER + SHIFT + ALT + G")
+
+-- Was: ChatGPT (default web app, via { webapp = "https://chatgpt.com/" })
+-- Launches the default coding agent (currently "claude") in a terminal,
+-- via Omarchy's own omarchy-agent - see hypr/hyprland.lua for the matching
+-- workspace rule (org.omarchy.agent, a fixed app-id set by the script
+-- itself so every agent window shares one class regardless of which agent
+-- is configured as default).
+hl.unbind("SUPER + SHIFT + A")
+o.bind("SUPER + SHIFT + A", "Agent", { launch = "omarchy-agent" })

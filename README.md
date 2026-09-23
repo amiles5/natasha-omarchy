@@ -15,13 +15,10 @@ window-creation time, never retroactively to already-open windows.
 | Terminal (kitty) | `SUPER + RETURN` | 1 |
 | WhatsApp | `SUPER + SHIFT + C` | 2 |
 | Moneydance | `SUPER + SHIFT + D` | 3 |
-| Joplin | `SUPER + SHIFT + N` | 3 |
 | iCloud Photos | `SUPER + SHIFT + P` | 4 |
 | Firefox | `SUPER + SHIFT + RETURN` / `SUPER + SHIFT + B` | 5 |
 | Sonos (PWA) | `SUPER + SHIFT + M` | 6 |
-
-Note workspace 3 is shared by Moneydance and Joplin — intentional, not an
-oversight.
+| Joplin | `SUPER + SHIFT + N` | 7 |
 
 ## Logitech mouse/keyboard battery
 
