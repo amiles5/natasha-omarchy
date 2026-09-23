@@ -194,68 +194,6 @@ keybinding (`hypr/bindings.lua`) and the workspace rule
 (`hypr/hyprland.lua`) — reinstalling the PWA generates a *different* ID,
 so both need updating to match if that ever happens.
 
-## Windows VM (`omarchy-windows-vm`)
-
-### The recurring `~/Windows` permission bug
-
-Every time the VM actually runs — even after a perfectly clean
-`omarchy-windows-vm stop` — its own shared-folder setup leaves `~/Windows`
-(the shared-folder bind-mount source) at mode `2777` with a setgid bit.
-`chmod` cannot clear that setgid bit once it's been set (confirmed by
-testing outside the container too — it's a filesystem/directory-level
-quirk, not something Docker-specific). The packaged script's own
-`assert_mounts_safe` check then refuses the *next* `launch`/`remove` until
-that directory is back to exactly `700`, failing with either "failed to
-start" or (on `remove`) `Windows VM removal stopped before user-side
-cleanup`.
-
-Manual fix, when it recurs and the directory is confirmed empty:
-
-```bash
-mountpoint -q /var/lib/omarchy/windows/mounts/users/$(id -u)/shared &&
-  pkexec umount /var/lib/omarchy/windows/mounts/users/$(id -u)/shared
-rmdir ~/Windows && mkdir -m 0700 ~/Windows
-```
-
-### The self-healing wrapper
-
-`~/.local/bin/omarchy-windows-vm-safe` (not tracked in this repo — lives
-outside `~/.config`) wraps the packaged binary: before delegating, it
-checks whether `~/Windows` needs fixing and, if so and it's safe to
-(VM not currently up, directory confirmed empty first — it will never
-delete real files), does the rmdir/mkdir dance above automatically.
-
-The "is the VM up" check is a plain TCP probe against port 3389, not
-`docker inspect` — this wrapper runs from a non-interactive desktop
-launcher as often as a terminal, and a privileged call that stalls on an
-unanswerable password/polkit prompt must never hang the launch.
-
-Wired into every real invocation path:
-- `~/.local/share/applications/windows-vm.desktop`'s `Exec=` points at the
-  wrapper (this file is regenerated if `omarchy-windows-vm install` is
-  ever rerun after being removed — repoint it again if so).
-- `~/.bashrc` defines an `omarchy-windows-vm` shell function that calls the
-  wrapper, shadowing the packaged binary for interactive/CLI use (`.bashrc`
-  is not tracked in this repo either).
-- `omarchy/extensions/omarchy-menu.jsonc` overrides the `install.windows`
-  and `remove.windows` menu actions to call the wrapper directly. **Gap
-  found and fixed 2026-09-22**: those two menu actions run via
-  `omarchy-launch-floating-terminal-with-presentation`, which execs
-  `bash -c "..."` — a non-interactive shell that never sources `.bashrc`,
-  so the function-shadow trick above doesn't reach this path. Hit the
-  `~/Windows` setgid bug through exactly this gap once, confirming it
-  wasn't just theoretical.
-
-### Verified lifecycle (2026-09-11)
-
-Startup (resumes the existing disk, no reinstall), clean `stop`, and RDP
-login (`xfreerdp3`, full session with graphics/input/sound channels) all
-confirmed working end-to-end. One caveat worth remembering: interrupting
-Windows Setup mid-install (e.g. killing the launch process before it
-finishes) forces the *next* launch to rebuild the ~64GB disk from scratch
-rather than resuming — let a fresh install run to completion (15-30+ min)
-before stopping it.
-
 ## Syncing settings to another machine (`omarchy-sync-settings`)
 
 `~/.local/bin/omarchy-sync-settings` (not tracked here — lives outside
