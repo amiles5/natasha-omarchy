@@ -89,6 +89,50 @@ patching `toggleDisplay()`: re-enabling now runs
 `hyprctl keyword monitor DP-4,preferred,auto,auto && hyprctl reload` — the
 `hyprctl reload` immediately after reasserts `monitors.lua`'s forced mode.
 
+## Hybrid graphics (iGPU/dGPU toggle)
+
+Following [wiki.t2linux.org/guides/hybrid-graphics](https://wiki.t2linux.org/guides/hybrid-graphics/)
+(this exact model, `MacBookPro15,1`, is explicitly listed). Two independent
+pieces, both boot-time only — confirmed twice over, empirically (`vga_switcheroo`
+refuses a live switch outright — see the GPU-power-widget incident history,
+now removed, in earlier commits) and by this wiki (`amdgpu-off`'s own docs
+say applying it reboots the machine):
+
+- **`/etc/modprobe.d/apple-gmux.conf`** (`options apple-gmux force_igd=y`)
+  — makes the Intel iGPU the default display GPU via `apple_gmux`'s actual
+  hardware mux, not a PRIME/Optimus-style software render-offload setup.
+  Confirmed via `sudo cat /sys/kernel/debug/vgaswitcheroo/switch`: the `+`
+  marker moved from `DIS` (AMD) to `IGD` (Intel) after rebooting with this
+  in place.
+- **`/etc/systemd/system/amdgpu-off.service`** — a `oneshot` unit
+  (`Before=display-manager.service`) that writes `OFF` to
+  `vgaswitcheroo/switch`, fully powering down the AMD dGPU rather than
+  just leaving it muxed-out-but-idle. Confirmed: `power1_input` on the
+  AMD `hwmon` device goes from a live wattage reading to no reading at
+  all (device genuinely gone, not just quiesced) once applied.
+
+Toggle with the bash aliases in `.bashrc` (not tracked in this repo —
+`dgpu-off`/`dgpu-on` both reboot immediately, `dgpu-status` doesn't):
+
+```bash
+alias dgpu-off='sudo systemctl enable amdgpu-off.service; sleep 2; sudo reboot'
+alias dgpu-on='sudo systemctl disable amdgpu-off.service; sleep 2; sudo reboot'
+alias dgpu-status='sudo cat /sys/kernel/debug/vgaswitcheroo/switch'
+```
+
+### Open question: does the Studio Display need the dGPU?
+
+Not established either way. The original assumption (external
+Thunderbolt/DisplayPort is wired through the discrete GPU on this model,
+only the internal panel is mux-able) was never actually tested — earlier
+attempts at live switching were refused by the driver before ever
+reaching a state where that could be observed, and the t2linux wiki page
+above doesn't mention external displays at all, which if anything argues
+mildly against the assumption (a guide this thorough about disabling the
+dGPU for power savings would likely flag a "loses your external monitor"
+caveat if that were commonly hit). Only a real test — `dgpu-off` with the
+Studio Display connected — would actually settle it.
+
 ## Sonos bar widget + auto-duck
 
 Ported from [amiles5/ayana-omarchy](https://github.com/amiles5/ayana-omarchy)
