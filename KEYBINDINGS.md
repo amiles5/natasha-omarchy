@@ -152,24 +152,23 @@ Full current keybinding table for `natasha`, generated from
 | `SUPER SHIFT ALT + A` | Grok |
 | `SUPER SHIFT ALT + DOWN` | Move workspace to down monitor |
 | `SUPER SHIFT ALT + E` | New email |
-| `SUPER SHIFT ALT + G` | WhatsApp |
 | `SUPER SHIFT ALT + LEFT` | Move workspace to left monitor |
 | `SUPER SHIFT ALT + M` | Music TUI |
 | `SUPER SHIFT ALT + RIGHT` | Move workspace to right monitor |
 | `SUPER SHIFT ALT + UP` | Move workspace to up monitor |
 | `SUPER SHIFT ALT + X` | X Post |
 | `SUPER SHIFT + BACKSPACE` | Toggle window gaps |
-| `SUPER SHIFT + C` | Calendar |
 | `SUPER SHIFT CTRL + A` | Agent |
 | `SUPER SHIFT CTRL + G` | Google Messages |
 | `SUPER SHIFT CTRL + R` | Clear reminders |
-| `SUPER SHIFT + D` | Docker |
+| `SUPER SHIFT + C` | WhatsApp |
+| `SUPER SHIFT + D` | Moneydance |
 | `SUPER SHIFT + E` | Email |
 | `SUPER SHIFT + G` | Signal |
-| `SUPER SHIFT + M` | Music |
+| `SUPER SHIFT + M` | Sonos |
 | `SUPER SHIFT + N` | Joplin |
 | `SUPER SHIFT + O` | Obsidian |
-| `SUPER SHIFT + P` | Google Photos |
+| `SUPER SHIFT + P` | iCloud Photos |
 | `SUPER SHIFT + S` | Google Maps |
 | `SUPER SHIFT + SLASH` | Passwords |
 | `SUPER SHIFT + SPACE` | Toggle top bar |

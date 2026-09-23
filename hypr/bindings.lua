@@ -45,4 +45,15 @@ o.bind("SUPER + SHIFT + D", "Moneydance", { launch = "/home/milesj/moneydance/Mo
 -- Sonos web app (play.sonos.com), installed as a real Firefox PWA via
 -- firefoxpwa - see natasha-omarchy README. Site ID is fixed at install
 -- time; reinstalling generates a new one and this must be updated to match.
-o.bind("SUPER + SHIFT + U", "Sonos", { launch = "firefoxpwa site launch 01M2X6JBSYM1EQA9QMQ3X4Q4RM" })
+-- Was: Music (default, via { omarchy = "spotify" }) - only this key's
+-- meaning changed. Previously also bound to SUPER+SHIFT+U, removed since
+-- this is now the only Sonos binding.
+hl.unbind("SUPER + SHIFT + M")
+o.bind("SUPER + SHIFT + M", "Sonos", { launch = "firefoxpwa site launch 01M2X6JBSYM1EQA9QMQ3X4Q4RM" })
+
+-- Was: Calendar (default web app, via { webapp = "https://app.hey.com/calendar/weeks/" })
+-- Previously also bound to the default SUPER+SHIFT+ALT+G, removed below
+-- since this is now the only WhatsApp binding.
+hl.unbind("SUPER + SHIFT + C")
+o.bind("SUPER + SHIFT + C", "WhatsApp", { webapp = "https://web.whatsapp.com/", focus = true })
+hl.unbind("SUPER + SHIFT + ALT + G")

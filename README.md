@@ -4,6 +4,25 @@ Omarchy/Hyprland config for `natasha` (MacBookPro15,1, T2 chip, dual GPU:
 Intel Coffee Lake iGPU + AMD Polaris11 dGPU). Tracks `hypr/` and `omarchy/`
 only — see `.gitignore`.
 
+## App keybindings & workspaces
+
+Custom keybindings (`hypr/bindings.lua`) and workspace assignments
+(`hypr/hyprland.lua`), together in one place. Workspace rules only apply at
+window-creation time, never retroactively to already-open windows.
+
+| App | Keybinding | Workspace |
+| --- | --- | --- |
+| Terminal (kitty) | `SUPER + RETURN` | 1 |
+| WhatsApp | `SUPER + SHIFT + C` | 2 |
+| Moneydance | `SUPER + SHIFT + D` | 3 |
+| Joplin | `SUPER + SHIFT + N` | 3 |
+| iCloud Photos | `SUPER + SHIFT + P` | 4 |
+| Firefox | `SUPER + SHIFT + RETURN` / `SUPER + SHIFT + B` | 5 |
+| Sonos (PWA) | `SUPER + SHIFT + M` | 6 |
+
+Note workspace 3 is shared by Moneydance and Joplin — intentional, not an
+oversight.
+
 ## Logitech mouse/keyboard battery
 
 `omarchy/bar/scripts/logitech-battery.py` — another plain `omarchy.bar`
