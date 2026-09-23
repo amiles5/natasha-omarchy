@@ -59,10 +59,10 @@ o.bind("SUPER + SHIFT + C", "WhatsApp", { webapp = "https://web.whatsapp.com/", 
 hl.unbind("SUPER + SHIFT + ALT + G")
 
 -- Was: ChatGPT (default web app, via { webapp = "https://chatgpt.com/" })
--- Launches the default coding agent (currently "claude") in a terminal,
--- via Omarchy's own omarchy-agent - see hypr/hyprland.lua for the matching
--- workspace rule (org.omarchy.agent, a fixed app-id set by the script
--- itself so every agent window shares one class regardless of which agent
--- is configured as default).
+-- Opens a kitty terminal running `claude --continue` directly (not via
+-- Omarchy's omarchy-agent, which picks the configured default agent and
+-- always starts a fresh session). --class gives this specific kitty
+-- instance its own app-id, distinct from plain "kitty" (workspace 1 -
+-- see hypr/hyprland.lua), so only this one gets the workspace 10 rule.
 hl.unbind("SUPER + SHIFT + A")
-o.bind("SUPER + SHIFT + A", "Agent", { launch = "omarchy-agent" })
+o.bind("SUPER + SHIFT + A", "Agent", { launch = "kitty --class milesj.agent -e claude --continue" })
