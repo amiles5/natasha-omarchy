@@ -19,6 +19,13 @@ window-creation time, never retroactively to already-open windows.
 | Firefox | `SUPER + SHIFT + RETURN` / `SUPER + SHIFT + B` | 5 |
 | Sonos (PWA) | `SUPER + SHIFT + M` | 6 |
 | Joplin | `SUPER + SHIFT + N` | 7 |
+| Claude (kitty, `claude --continue`) | `SUPER + SHIFT + A` | 10 |
+
+Claude's binding launches `kitty --class milesj.agent -e claude --continue`
+directly, rather than Omarchy's own `omarchy-agent` (which picks whatever
+the configured default agent is and always starts a fresh session) —
+`--class` gives this specific kitty instance its own app-id so the
+workspace 10 rule doesn't catch every other `kitty` window (workspace 1).
 
 ## Logitech mouse/keyboard battery
 
