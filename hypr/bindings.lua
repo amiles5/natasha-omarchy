@@ -66,3 +66,8 @@ hl.unbind("SUPER + SHIFT + ALT + G")
 -- see hypr/hyprland.lua), so only this one gets the workspace 10 rule.
 hl.unbind("SUPER + SHIFT + A")
 o.bind("SUPER + SHIFT + A", "Agent", { launch = "kitty --class milesj.agent -e claude --continue" })
+
+-- Task Manager TMOG (~/Applications/TaskManagerOG.AppImage). Re-launching
+-- forwards to the already-running instance and raises it instead of
+-- opening a duplicate, so this key doubles as a toggle/summon.
+o.bind("SUPER + SHIFT + T", "Task Manager", { launch = "/home/milesj/Applications/TaskManagerOG.AppImage" })
