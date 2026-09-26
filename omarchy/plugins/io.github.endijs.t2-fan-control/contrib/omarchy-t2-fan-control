@@ -1,0 +1,97 @@
+#!/usr/bin/bash
+
+set -euo pipefail
+PATH=/usr/bin:/bin
+export PATH
+
+config=/etc/t2fand.conf
+service=t2fanrd.service
+state_dir=/var/lib/omarchy-t2-fan-control
+original_config="$state_dir/original-t2fand.conf"
+
+fail() {
+  printf '%s\n' "$*" >&2
+  exit 1
+}
+
+capture_original() {
+  [[ -f $config ]] || fail "$config does not exist; configure t2fanrd before using this plugin"
+  [[ -f $original_config ]] && return
+
+  install -d -o root -g root -m 0755 "$state_dir"
+  local snapshot
+  snapshot=$(mktemp "$state_dir/.original-t2fand.conf.XXXXXX")
+  cp -a -- "$config" "$snapshot"
+  mv -n -- "$snapshot" "$original_config"
+  rm -f -- "$snapshot"
+}
+
+apply_config() {
+  [[ $# == 4 ]] || fail "Expected: LOW HIGH CURVE FULL_SPEED"
+  local low="$1" high="$2" curve="$3" full="$4" fan_count=1 temp rollback
+
+  [[ $low =~ ^[0-9]+$ && $high =~ ^[0-9]+$ ]] || fail "Temperatures must be whole numbers"
+  (( low >= 35 && low <= 80 )) || fail "Low temperature must be between 35 and 80°C"
+  (( high >= 45 && high <= 100 )) || fail "High temperature must be between 45 and 100°C"
+  (( high >= low + 5 )) || fail "High temperature must be at least 5°C above low temperature"
+  [[ $curve == linear || $curve == exponential || $curve == logarithmic ]] || fail "Unsupported speed curve"
+  [[ $full == true || $full == false ]] || fail "Full-speed value must be true or false"
+
+  if [[ -r $config ]]; then
+    # Parentheses are required here: without them, awk can parse `>` as
+    # output redirection instead of the comparison inside the ternary.
+    fan_count=$(awk '/^\[Fan[0-9]+\]$/ { count++ } END { print (count > 0 ? count : 1) }' "$config")
+  fi
+
+  capture_original
+  temp=$(mktemp "$(dirname "$config")/.t2fand.conf.XXXXXX")
+  rollback=$(mktemp "$state_dir/.rollback-t2fand.conf.XXXXXX")
+  trap 'rm -f -- "${temp:-}" "${rollback:-}"' EXIT
+  cp -a -- "$config" "$rollback"
+  : >"$temp"
+  local fan
+  for (( fan = 1; fan <= fan_count; fan++ )); do
+    (( fan > 1 )) && printf '\n' >>"$temp"
+    printf '[Fan%d]\nlow_temp=%d\nhigh_temp=%d\nspeed_curve=%s\nalways_full_speed=%s\n' \
+      "$fan" "$low" "$high" "$curve" "$full" >>"$temp"
+  done
+
+  chown --reference="$config" "$temp"
+  chmod --reference="$config" "$temp"
+  mv -- "$temp" "$config"
+  if ! systemctl restart "$service"; then
+    cp -a -- "$rollback" "$config"
+    systemctl restart "$service" || true
+    fail "t2fanrd rejected the new configuration; the previous file was restored"
+  fi
+  printf 'Fan curve saved and t2fanrd restarted\n'
+}
+
+restore_original() {
+  [[ $# == 0 ]] || fail "The restore command does not accept arguments"
+  [[ -f $original_config ]] || fail "No original configuration snapshot is available"
+  [[ -f $config ]] || fail "$config does not exist"
+
+  local rollback
+  rollback=$(mktemp "$state_dir/.rollback-t2fand.conf.XXXXXX")
+  trap 'rm -f -- "${rollback:-}"' EXIT
+  cp -a -- "$config" "$rollback"
+  cp -a -- "$original_config" "$config"
+  if ! systemctl restart "$service"; then
+    cp -a -- "$rollback" "$config"
+    systemctl restart "$service" || true
+    fail "t2fanrd rejected the original configuration; the current file was restored"
+  fi
+
+  rm -f -- "$original_config"
+  rmdir "$state_dir" 2>/dev/null || true
+  printf 'Original t2fanrd configuration restored\n'
+}
+
+(( EUID == 0 )) || fail "Administrator authorization is required"
+
+case "${1:-}" in
+  apply) shift; apply_config "$@" ;;
+  restore) shift; restore_original "$@" ;;
+  *) fail "Expected: apply or restore" ;;
+esac

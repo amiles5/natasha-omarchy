@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+config=/etc/t2fand.conf
+service=t2fanrd.service
+state_dir=/var/lib/omarchy-t2-fan-control
+original_config="$state_dir/original-t2fand.conf"
+privileged_helper=/usr/local/libexec/omarchy-t2-fan-control
+
+fail() {
+  printf '%s\n' "$*" >&2
+  exit 1
+}
+
+read_setting() {
+  local key="$1" fallback="$2"
+  awk -F= -v key="$key" '
+    /^\[Fan1\]$/ { in_fan = 1; next }
+    /^\[/ { in_fan = 0 }
+    in_fan && $1 == key {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+      print $2
+      exit
+    }
+  ' "$config" 2>/dev/null || printf '%s\n' "$fallback"
+}
+
+find_smc() {
+  local path
+  for path in /sys/bus/acpi/devices/APP0001:*/fan1_input; do
+    [[ -r $path ]] && { dirname "$path"; return 0; }
+  done
+  return 1
+}
+
+cpu_temperature() {
+  local hwmon input hottest=0 value
+  for hwmon in /sys/class/hwmon/hwmon*; do
+    [[ $(cat "$hwmon/name" 2>/dev/null || true) == coretemp ]] || continue
+    for input in "$hwmon"/temp*_input; do
+      [[ -r $input ]] || continue
+      value=$(<"$input")
+      (( value > hottest )) && hottest=$value
+    done
+  done
+  printf '%d' "$((hottest / 1000))"
+}
+
+status() {
+  local smc="" rpm=0 minimum=0 maximum=0 low high curve full running=false original_saved=false helper_installed=false
+  local fans_json="" input index fan_rpm fan_min fan_max
+  smc=$(find_smc || true)
+  if [[ -n $smc ]]; then
+    for input in "$smc"/fan*_input; do
+      [[ -r $input ]] || continue
+      [[ ${input##*/} =~ ^fan([0-9]+)_input$ ]] || continue
+      index=${BASH_REMATCH[1]}
+      fan_rpm=$(<"$input")
+      fan_min=0
+      fan_max=0
+      [[ -r $smc/fan${index}_min ]] && fan_min=$(<"$smc/fan${index}_min")
+      [[ -r $smc/fan${index}_max ]] && fan_max=$(<"$smc/fan${index}_max")
+      [[ -z $fans_json ]] || fans_json+=,
+      fans_json+=$(printf '{"index":%d,"rpm":%d,"minRpm":%d,"maxRpm":%d}' \
+        "$index" "$fan_rpm" "$fan_min" "$fan_max")
+      if (( index == 1 )); then
+        rpm=$fan_rpm
+        minimum=$fan_min
+        maximum=$fan_max
+      fi
+    done
+  fi
+  low=$(read_setting low_temp 55); low=${low:-55}
+  high=$(read_setting high_temp 75); high=${high:-75}
+  curve=$(read_setting speed_curve linear); curve=${curve:-linear}
+  full=$(read_setting always_full_speed false); full=${full:-false}
+  systemctl is-active --quiet "$service" && running=true
+  [[ -f $original_config ]] && original_saved=true
+  [[ -x $privileged_helper ]] && helper_installed=true
+  printf '{"temperature":%d,"fans":[%s],"rpm":%d,"minRpm":%d,"maxRpm":%d,"lowTemp":%d,"highTemp":%d,"curve":"%s","fullSpeed":%s,"running":%s,"originalSaved":%s,"helperInstalled":%s}\n' \
+    "$(cpu_temperature)" "$fans_json" "$rpm" "$minimum" "$maximum" "$low" "$high" "$curve" "$full" "$running" "$original_saved" "$helper_installed"
+}
+
+case "${1:-status}" in
+  status) [[ $# -le 1 ]] || fail "The status command does not accept arguments"; status ;;
+  *) fail "Unknown command: $1" ;;
+esac

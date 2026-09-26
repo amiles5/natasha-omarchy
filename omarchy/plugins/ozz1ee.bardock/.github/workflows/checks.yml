@@ -1,0 +1,40 @@
+name: checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: model and compat tests
+        run: node --test test/*.test.js
+
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: manifest contract
+        run: python3 scripts/check-manifest.py .
+
+  ascii:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: text files are ASCII
+        run: |
+          set -euo pipefail
+          files=$(git ls-files '*.md' '*.js' '*.qml' '*.json' '*.sh' '*.py' '*.yml')
+          if LC_ALL=C grep -nP '[^\x00-\x7F]' $files; then
+            echo "non-ASCII characters found in the lines above"
+            exit 1
+          fi
+          echo "all tracked text files are ASCII"

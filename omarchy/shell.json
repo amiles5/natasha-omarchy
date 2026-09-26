@@ -13,9 +13,6 @@
           "verticalFormat": "HH\n—\nmm"
         },
         {
-          "id": "omarchy.keyboard-layout"
-        },
-        {
           "id": "omarchy.weather"
         },
         {
@@ -32,16 +29,59 @@
       ],
       "right": [
         {
-          "id": "omarchy.tray"
-        },
-        {
-          "id": "omarchy.tailscale"
-        },
-        {
-          "id": "omarchy.agents"
-        },
-        {
-          "id": "omarchy.bluetooth"
+          "id": "ozz1ee.bardock",
+          "docked": [
+            {
+              "id": "omarchy.agents",
+              "dockedBy": "ozz1ee.bardock"
+            },
+            {
+              "id": "omarchy.tailscale",
+              "dockedBy": "ozz1ee.bardock"
+            },
+            {
+              "id": "omarchy.bluetooth",
+              "dockedBy": "ozz1ee.bardock"
+            },
+            {
+              "id": "io.github.endijs.t2-fan-control",
+              "dockedBy": "ozz1ee.bardock"
+            },
+            {
+              "id": "milesj.monitor",
+              "dockedBy": "ozz1ee.bardock"
+            },
+            {
+              "id": "omarchy.keyboard-layout",
+              "dockedBy": "ozz1ee.bardock"
+            }
+          ],
+          "dockHomes": {
+            "omarchy.agents": {
+              "section": "right",
+              "before": "omarchy.bluetooth"
+            },
+            "omarchy.tailscale": {
+              "section": "right",
+              "before": "omarchy.bluetooth"
+            },
+            "omarchy.bluetooth": {
+              "section": "right",
+              "before": "logitech-battery"
+            },
+            "io.github.endijs.t2-fan-control": {
+              "section": "right",
+              "before": "logitech-battery"
+            },
+            "milesj.monitor": {
+              "section": "right",
+              "before": "omarchy.power"
+            },
+            "omarchy.keyboard-layout": {
+              "section": "center",
+              "before": "omarchy.weather"
+            }
+          }
         },
         {
           "id": "logitech-battery",
@@ -64,9 +104,6 @@
           "id": "omarchy.audio"
         },
         {
-          "id": "milesj.monitor"
-        },
-        {
           "id": "omarchy.power",
           "showPercentage": true
         },
@@ -82,6 +119,31 @@
     "lock": 1805,
     "screensaver": 1800
   },
-  "plugins": [],
+  "plugins": [
+    {
+      "id": "omarchy.agents",
+      "dockedBy": "ozz1ee.bardock"
+    },
+    {
+      "id": "omarchy.tailscale",
+      "dockedBy": "ozz1ee.bardock"
+    },
+    {
+      "id": "omarchy.bluetooth",
+      "dockedBy": "ozz1ee.bardock"
+    },
+    {
+      "id": "io.github.endijs.t2-fan-control",
+      "dockedBy": "ozz1ee.bardock"
+    },
+    {
+      "id": "milesj.monitor",
+      "dockedBy": "ozz1ee.bardock"
+    },
+    {
+      "id": "omarchy.keyboard-layout",
+      "dockedBy": "ozz1ee.bardock"
+    }
+  ],
   "version": 1
 }
