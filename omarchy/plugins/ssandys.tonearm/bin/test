@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Run every test suite. Python uses stdlib unittest: the active python3 is
+# mise-managed and has no pytest.
+set -euo pipefail
+shopt -s nullglob
+
+SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$SRC"
+
+echo "== manifest =="
+jq -e . manifest.json >/dev/null && echo "  valid json"
+
+echo "== bash syntax =="
+# Globbed, not named. A by-name list silently omits every script added later --
+# a new bin/ entry with a syntax error would pass this suite green. bin/ holds
+# only bash by convention in these plugins; a non-bash entry must revisit this.
+# nullglob covers a plugin with no scripts/*.sh, and bin/* is never empty since
+# bin/test is itself running, so `bash -n` can never fall through to stdin.
+bash -n bin/* scripts/*.sh
+echo "  ok"
+
+echo "== qml syntax =="
+# qmllint catches parse errors only. It does NOT resolve Quickshell/omarchy
+# imports, so unknown components and bad property references still pass. Treat
+# this as "the file parses", not "the QML is correct".
+#
+# nullglob is set above, so an unmatched *.qml yields no iterations rather than
+# a literal pattern; the -e guard below is redundant but kept, since it costs
+# nothing and keeps the loop correct if nullglob is ever moved or scoped.
+if command -v qmllint >/dev/null 2>&1; then
+  for qml in *.qml; do
+    [ -e "$qml" ] || continue
+    qmllint "$qml" || { echo "  qmllint failed on $qml"; exit 1; }
+  done
+  echo "  ok"
+else
+  echo "  qmllint not installed, skipped"
+fi
+
+echo "== python =="
+# Prefer the SYSTEM python. The active python3 here is usually mise-managed and
+# does not carry websocket-client or dbus-next, so `roonapi` and `mpris` fail to
+# import under it and a third of the suite errors out for a reason that has
+# nothing to do with the code. $PYTHON overrides, and python3 is the fallback
+# for a machine (or a CI runner) with no /usr/bin/python at all.
+if [ -z "${PYTHON:-}" ]; then
+  if [ -x /usr/bin/python ]; then PYTHON=/usr/bin/python; else PYTHON=python3; fi
+fi
+echo "  using $PYTHON ($("$PYTHON" --version 2>&1))"
+
+# Discovery is explicit: `python -m unittest` with no args only finds tests
+# under the CWD matching test*.py, and scripts/ is not a package root.
+python_rc=0
+if [ -d tests/python ]; then
+  "$PYTHON" -m unittest discover -s tests/python -t . -v || python_rc=$?
+  # 5 means "no tests collected" (Python 3.12+), which is valid only before the
+  # first suite lands. Any other non-zero is a real failure.
+  if [ "$python_rc" -eq 5 ]; then
+    echo "  no python tests collected yet"
+    python_rc=0
+  fi
+else
+  echo "  no python tests yet, skipped"
+fi
+
+echo "== javascript =="
+# Auto-discovery finds tests/*.test.js. Bare form is used because passing an empty
+# directory as an argument throws MODULE_NOT_FOUND in Node.js.
+js_rc=0
+node --test || js_rc=$?
+
+# Both suites always run, and the exit code is decided here. Exiting early on a
+# Python failure -- as an earlier version did -- silently skipped the JS suite
+# entirely, so a JS regression could hide behind an unrelated Python one.
+if [ "$python_rc" -ne 0 ] || [ "$js_rc" -ne 0 ]; then
+  echo "FAILED: python=$python_rc javascript=$js_rc" >&2
+  exit 1
+fi

@@ -1,0 +1,278 @@
+# Follow-ups
+
+Known gaps carried past the MVP, with enough context to act on each without
+re-deriving it. Roughly ordered by whether a user can notice.
+
+**The numbers are permanent identifiers, not positions.** Code comments cite
+them (`browse.py`, `server.py`, `Panel.qml`), so a closed item's number is
+retired rather than reused and the sequence is expected to have gaps. The gaps
+are not enumerated here -- that list went stale twice. Every retired number is
+either in **Closed** below or was retired without one.
+
+Cite code by symbol rather than by line. Line references in this file have
+drifted twice; `Server._handle`'s `status` branch does not move when something
+above it does.
+
+Closed items are recorded at the bottom so a future reader does not re-open
+them.
+
+## 2. `position()` clamps to `length` only while playing
+
+A paused zone reporting `position > length` returns the unclamped value, so the
+seek bar could render past its end. Low probability (depends on Roon's data),
+cosmetic.
+
+## 6. Nothing enforces `Model.js`'s ES3-subset or no-mutable-module-state rules
+
+Both constraints exist because `Model.js` is loaded by both node and Qt's V4,
+and both are currently checked by human review on every change. A lint-style
+test would close a whole class of regression. This is the constraint most likely
+to be broken by someone who has not read `CONTRIBUTING.md`.
+
+## 7. Untested branch: `formatTime` with `h > 0 && m >= 10`
+
+E.g. `4200` → `"1:10:00"`. Correct by construction, but the minute-padding rule
+has a branch no test exercises.
+
+## 10. Paging is implemented in the protocol but unreachable from the UI
+
+`BrowseSession.page(offset)`, the `page` op and `tonearmctl browse page` all
+work and are tested. `BrowsePane.qml` never calls them, so only the first 100
+rows of a level are reachable from the widget.
+
+This is invisible for search results, which are narrow — the measured
+`"Oingo Boingo"` case returns 21 albums and 44 tracks. It becomes visible on a
+common single-word search against a large library, where `Tracks` could exceed
+100. The fix is to call `page` when the `ListView` nears its end and append,
+which also needs the daemon to return rows for an offset without resetting the
+cursor — `page` already does exactly that.
+
+## 11. No progress indicator during a search
+
+A `browse` search round-trip (spawn `tonearmctl browse search`, wait for
+Roon's reply) shows nothing while in flight — no spinner, no "Searching…"
+text. `BrowsePane.qml`'s `hasContent` includes `busy` (`BrowsePane.qml:58`),
+so the pane and the submitted query stay on screen for the round-trip rather
+than vanishing, which is why this hasn't looked outright broken in testing.
+But nothing on screen says work is happening, so a slow search — a large
+library, a loaded Core — reads as a hang. The fix is a busy indicator bound
+to the existing `busy` property; no new state is needed, just something
+visible while it's true.
+
+## 14. A reset lost to `busy` at popup close is discarded, not delayed
+
+`resetPane()` routes through `_send`, which returns early when `busy` is true —
+so closing the popup while a browse is in flight drops the reset. Nothing
+retries it. The in-flight reply then lands, `_apply` clears `busy` and
+`_applyLevel` **repopulates** `rows`/`path`. On the next open, `hasContent` is
+true via `path.length > 0`, so the separator and the whole pane render.
+
+That is exactly the idle-height regression items R13/R14 cost two fix rounds to
+close, still reachable on this one path — press Esc or click away immediately
+after Enter. Combined with item 13 (no socket timeout), a wedged daemon pins
+`busy` forever and `resetPane()` can never fire at all.
+
+Clearing state optimistically does not work — it loses to the same in-flight
+reply. The fix is a `_resetPending` flag set by `resetPane()` when `_send`
+returns false, honoured in `_apply` once `busy` clears.
+
+## 15. `play()` re-reads the zone several times (TOCTOU)
+
+`_opts()` calls the zone provider on every browse and load, so a single `play()`
+reads it many times across the descent walk and the unwind. If the zone
+*vanishes* between the `no_zone` guard and the action invoke, the C0 failure
+returns in miniature: `played: true` over silence. If it merely *changes*, the
+play lands in the new room, which is arguably what a repin should do.
+
+Browse position is per-`multi_session_key`, not per-zone, so a mid-play repin
+cannot corrupt the walk itself — only the final invoke's target matters, and it
+uses the freshest value. Severity is low. The cheap close is to read the zone
+once at the top of `play()` and thread it through as an `_opts(zone=…)`
+override, leaving per-call reads everywhere else.
+
+## 16. Browse threads call `Arbiter.observe()` outside `CachingSession`'s lock
+
+`CachingSession` exists specifically to serialize `Arbiter`'s unlocked mutations
+across threads — its docstring says so at length. But `CachingSession.browse()`
+is a deliberate unlocked pass-through, and `selected_zone_id()` reaches
+`_zones()` → `Arbiter.observe()`. So browse threads now mutate
+`_last_state`/`_started_at`/`_counter` outside the lock added to protect them,
+concurrently with subscriber `snapshot()` calls that hold it.
+
+This is a frequency increase on a pre-existing hazard, not a new class of one:
+`RoonSession._publish()` already bypasses the wrapper entirely, and `art.py`
+records that. `observe()` was verified idempotent (1× vs 5× produce identical
+state; 10× consumes one counter value), and under CPython each dict write and
+`next(counter)` is atomic, so nothing corrupts. Worst case is `_last_followed`
+computed from a momentarily mixed `_started_at` — a transient wrong zone in the
+bar.
+
+One visible consequence worth knowing: extra sampling between publishes can now
+catch a zone that flaps playing→paused→playing and would previously have gone
+unnoticed, so the followed zone can change because the user opened the browse
+popup.
+
+## 17. Clicking away from the search field leaves the key catcher blocked
+
+`BrowsePane`'s `field.onActiveFocusChanged` handles only the gaining edge, so
+losing focus by mouse — clicking elsewhere in the popup — never clears
+`editing`. `PanelKeyCatcher` stays `blocked: true` while nothing holds field
+focus, so keyboard navigation goes dead until the field is focused and released
+again.
+
+Pre-existing and untouched by the browse work, but browse is what made the popup
+keyboard-driven enough for it to matter. The fix is to call `releaseSearch()` on
+the losing edge.
+
+## 18. Tidiness
+
+- The `(started_at, id)` ranking tuple is duplicated between `Arbiter.observe()`'s
+  recompute and `select()`'s active branch.
+- `_try_port`'s docstring duplicates most of the `STOP_GRACE` module comment.
+- `CachingSession.snapshot()` mutates the wrapped session's returned
+  `now_playing` in place — safe only because `RoonSession.snapshot()` happens to
+  build fresh dicts each call. Undocumented assumption for a wrapper whose
+  docstring claims it wraps anything with `.snapshot()`.
+- `Cache._last_thread` is test-support state on a production class, assigned
+  outside the lock.
+- `_IGNORED_IFACE_PREFIXES` is a non-exhaustive heuristic (misses `wg`, `tun`,
+  `virbr`, `zt`); an unlisted virtual interface costs one wasted `/24` scan.
+- ~~`_local_networks()` does not dedup, so bonded or aliased interfaces on one
+  `/24` get scanned twice.~~ Fixed 2026-09-01: deduplicated in
+  `_local_networks()` and again in `_scan_targets()`, which also enforces a
+  512-address total budget. "Results dedup by host, so harmless" was wrong --
+  the results deduplicated, the connect attempts did not.
+- Both `tests/__init__.py` and `tests/python/__init__.py` exist; only the latter
+  is needed.
+- `THEME_BACKGROUND` and `CONTRAST_FLOOR` are exported beyond the interface the
+  plan specified.
+
+## 19. Zone transfer is mouse-only
+
+`transfer` is reachable from the CLI and from the cast icon on each zone row,
+but not from the keyboard. The popup's cursor model (`BrowsePane`'s `cursor`,
+driven by `PanelKeyCatcher.moveRequested`) covers only browse result rows —
+the zone list is not in it at all, so there is nothing for a key to act on.
+
+Adding it means extending the cursor over two structurally different row
+kinds in two different files, and finding a free key: `h j k l x X` and Space
+are taken by the shell before the widget sees them, and every other printable
+key opens search. Neither half is hard; together they are their own piece of
+work rather than a line in the transfer change.
+
+## Closed
+
+Recorded so they are not re-opened.
+
+Closed by the 0.11.0 review pass:
+
+- **The subscribe handshake called `conn.sendall()` under `Server._lock`.**
+  Fixed in `099a1fd`, during the marketplace review. `Server._subscribe` now
+  registers the subscriber under the global lock -- a list append and nothing
+  else -- and writes the snapshot outside it, under that subscriber's own
+  send lock. The ordering guarantee the item worried about losing is kept:
+  a broadcast racing the handshake finds the connection registered, blocks on
+  the per-socket lock only, and lands after the snapshot. This was item 3.
+
+- **`Cache._prune()`'s `getmtime` was unguarded.** Fixed in `cd3baca` (#3).
+  `listdir` and `unlink` were guarded; the stat in the sort key between them
+  was not, so a file removed in that window raised `FileNotFoundError` out of
+  a function documented best-effort -- from a thread target, so it surfaced as
+  an unhandled traceback and left the cache over its cap. Candidates are now
+  stated before anything is decided, and a missing one is skipped. This was
+  item 5.
+
+- **The `status` verb serialized outside its guard.** Fixed in `493fa29` (#4).
+  `except OSError` did not cover `json.dumps` raising `TypeError`, nor
+  `snapshot()` raising for an invalid status; either skipped the `conn.close()`
+  on the next line and leaked the descriptor. The guard is now `except
+  Exception` and the close is in a `finally`. `_subscribe` had handled this
+  case since it was written -- the defect was the decision being applied in
+  only one of the two places that needed it. This was item 8.
+
+- **The browse session dict was unbounded.** Fixed in `d0a5a0e`, during the
+  marketplace review, implementing exactly the remedy the item proposed:
+  `RoonSession._browse_sessions` is an `OrderedDict` capped at
+  `MAX_BROWSE_SESSIONS`, least-recently-used evicted first. This was item 9.
+
+Closed by the marketplace-review pass:
+
+- **`setup.sh` clobbered the unit file with an unguarded `cp`.** `cp` follows a
+  symlink at its destination, so a link planted at the unit path redirected the
+  write. It now refuses a symlink, a non-regular file, or a regular file that
+  is not tonearm's own unit, and installs through `mktemp` plus an atomic
+  rename. This was item 4, and the non-atomicity it also noted is closed by the
+  same change.
+
+- **`tonearmctl` set no socket timeout anywhere.** A daemon that accepted the
+  connection and then wedged left `readline()` blocked forever — including
+  `setup.sh --check`, which uses `status` as its health probe and so hung on
+  exactly the condition it exists to detect. Connect and both single-reply
+  reads now carry deadlines (per-verb: `status` 5s, `browse` 25s, overridable
+  with `TONEARM_REPLY_TIMEOUT`), and a timeout exits **4**, distinct from 3's
+  "not running", since the two faults have different remedies. `subscribe`
+  deliberately keeps blocking forever — it is a stream, and a paused zone can
+  emit nothing for hours.
+
+Closed by disconnect detection:
+
+- **A live Roon disconnect went unnoticed.** `_status` became `unreachable`
+  only during `start()`'s initial connect and never reverted, so a Core that
+  died left the daemon reporting `ok` forever with zone data quietly going
+  stale. `RoonSession._check_connection()` now samples the live socket every
+  2s and flips the status on a transition, and `snapshot()` publishes no zone
+  while the status is not `ok`.
+
+  It observes rather than exiting, because roonapi's own `_socket_watcher` is
+  already a reconnect loop (rebuild ~21s after a failure, forever) — exiting
+  the way `start()` does would discard a working recovery path and churn the
+  process for the length of an outage.
+
+  Still open from the original item: **the MPRIS name is not withdrawn on a
+  live disconnect.** The signal to hang it on now exists; wiring it means
+  driving `request_name`/`release_name` across the asyncio boundary from a
+  polling thread and re-publishing cleanly on every recovery, which is its own
+  piece of work. Media keys currently keep routing to tonearm through an
+  outage and silently do nothing.
+
+Closed by the popup redesign:
+
+- **Search was undiscoverable.** The field is still hidden until `/` or a
+  letter is pressed — the idle-height goal is intact — but the `ZONES` caption
+  line now carries a `/  search` hint on its right, which was empty space, so
+  the affordance cost no height at all. The hint is also clickable. This was
+  item 12, and it means the README is no longer the only place a user can
+  learn search exists.
+- **Queue was a write-only control.** The popup can't show a queue, so its
+  effect was invisible. Removing it from the UI also deleted
+  `BrowsePane.hasSelection` and `Panel.qml`'s context-sensitive `q` branch —
+  which existed only because `q` is both the queue key and the first letter of
+  Queen. The daemon no longer carries it either: keeping it there was protocol
+  surface with no consumer and no path to one, so the `action` argument that
+  selected between Play Now, Add Next, Queue and Start Radio was removed from
+  `browse.py`, the wire protocol and the CLI. `play` now takes an index and a
+  level.
+
+Closed after the final review:
+
+- Systemd's default start limit (5 starts / 10s) could have capped the daemon's
+  only retry mechanism, leaving the unit `failed` and silent rather than merely
+  disconnected. It was unreachable in practice, but only because
+  `sood.discover()`'s 6s floor makes a fail-restart cycle ~9s — an accidental
+  margin no test guards. Now pinned with `StartLimitIntervalSec=0` in `[Unit]`.
+
+Closed by the final review's fix wave:
+
+- Incremental-volume outputs reported a fabricated `value: 0` instead of `None`,
+  parking the popup slider at zero for a zone whose volume cannot be read.
+- The daemon connected exactly once and never retried, so a first-run pairing
+  window of ~25s was easy to miss.
+- `notifyCoreUnreachable` / `notifyZoneChange` were declared in the manifest and
+  documented in the README but never implemented.
+- The `/24` discovery scan was not restricted to private address space.
+- `setup.sh` required `curl`, which nothing uses.
+- `import fcntl` at module top level made an otherwise-portable module
+  Linux-only.
+- Three docstrings/comments described behaviour the code does not have
+  (`_raw_zones()`'s `RuntimeError`, `_seeded_api()`'s `ready` gate, `formatTime`'s
+  "also catches NaN").

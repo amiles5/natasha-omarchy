@@ -1,0 +1,144 @@
+#!/usr/bin/python
+"""tonearmd -- the Roon side of tonearm.
+
+Runs under the SYSTEM interpreter with no venv. Its only external dependencies
+are websocket-client (already present) and python-dbus-next; roonapi is vendored
+alongside this file.
+"""
+
+import logging
+import os
+import signal
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from tonearm_lib import art                           # noqa: E402
+from tonearm_lib import server                        # noqa: E402
+from tonearm_lib.core import RoonSession               # noqa: E402
+
+
+def main() -> int:
+    logging.basicConfig(
+        level=os.environ.get("TONEARM_LOG", "INFO"),
+        format="%(levelname)s %(name)s: %(message)s",
+    )
+
+    import asyncio
+    import threading
+
+    loop = asyncio.new_event_loop()
+    holder = {}
+
+    def fail(reason: str) -> None:
+        """Bring the daemon down so systemd's Restart=on-failure can fire.
+
+        The daemon's only retry mechanism is exiting non-zero: `RestartSec=3`
+        with `StartLimitIntervalSec=0` (systemd/tonearmd.service) means this
+        can be used freely and forever. Both callers below are cases where
+        the running process cannot recover in place -- a dead socket server,
+        and a Core that has moved to an address this process is not connected
+        to -- and where staying up would leave the unit reporting `active`
+        with a stale track and nothing retrying.
+        """
+        logging.getLogger("tonearmd").warning("restarting: %s", reason)
+        holder["failed"] = True
+        loop.call_soon_threadsafe(loop.stop)
+
+    def broadcast_current() -> None:
+        # Used both as the on_change hook (a Roon push) and as art.Cache's
+        # on_ready callback (a background art fetch finishing after the
+        # push that started it already went out). Re-reading the session's
+        # own snapshot() -- rather than trusting whatever payload the
+        # caller has in hand -- means every consumer (the socket fan-out
+        # and the MPRIS adapter alike) always sees the same art_path logic
+        # in tonearm_lib.art.CachingSession.snapshot().
+        payload = session.snapshot()
+        srv = holder.get("srv")
+        if srv:
+            srv.broadcast(payload)
+        adapter = holder.get("mpris")
+        if adapter:
+            # Roon's callback (and the art cache's on_ready callback) run on
+            # their own threads; the adapter must touch the bus only from
+            # the asyncio loop's own thread.
+            loop.call_soon_threadsafe(adapter.update, payload)
+
+    def on_change(_payload) -> None:
+        broadcast_current()
+
+    # on_restart_needed: the connection watcher never exits on its own (roonapi
+    # reconnects underneath it), with one exception -- discovery proving the
+    # Core now lives at a different address, which only a fresh connect can
+    # follow. See RoonSession._relocate.
+    raw_session = RoonSession(on_change,
+                              on_restart_needed=lambda: fail("the Roon Core moved"))
+    # ColorQuantizer cannot load the Core's remote :9330 image URL (measured:
+    # zero colors vs. eight for the identical bytes as a local file) -- so the
+    # daemon keeps a small local copy and hands back a path. See art.py.
+    cache = art.Cache(server.runtime_dir(), on_ready=broadcast_current)
+    session = art.CachingSession(raw_session, cache)
+
+    srv = server.Server(session)
+    holder["srv"] = srv
+
+    def shutdown(_signum, _frame):
+        raw_session.stop()
+        srv.shutdown()   # clears srv.running, so supervise() stays quiet
+
+        async def _teardown():
+            # Withdraw the MPRIS name rather than leave it advertising a
+            # stale track once the Roon connection is gone.
+            adapter = holder.get("mpris")
+            if adapter:
+                await adapter.stop()
+            loop.stop()
+
+        loop.call_soon_threadsafe(lambda: loop.create_task(_teardown()))
+
+    signal.signal(signal.SIGTERM, shutdown)
+    signal.signal(signal.SIGINT, shutdown)
+
+    def on_server_failure() -> None:
+        """The socket IS this daemon's purpose, so losing it must be visible.
+
+        Unlike MPRIS below -- deliberately not load-bearing -- a dead server
+        was invisible on a daemon thread: the loop below kept running, systemd
+        kept reporting the unit active, and the bar sat on a stale track with
+        nothing retrying. See tonearm_lib.server.supervise.
+        """
+        fail("the socket server died")
+
+    threading.Thread(target=server.supervise, args=(srv, on_server_failure),
+                     daemon=True).start()
+    raw_session.start()
+
+    async def boot():
+        # The import lives inside this try too: MPRIS is not load-bearing,
+        # so even a broken/missing dbus_next must not take the daemon down --
+        # only bus-unavailable or registration failures are expected in
+        # practice, but nothing here should be allowed to escape.
+        try:
+            from tonearm_lib.mpris import MprisAdapter
+            adapter = MprisAdapter(session)
+            await adapter.start()
+            holder["mpris"] = adapter
+            adapter.update(session.snapshot())
+        except Exception:
+            # Not load-bearing: the widget works without media keys.
+            logging.getLogger("tonearmd").exception(
+                "MPRIS unavailable; continuing without media keys")
+
+    loop.create_task(boot())
+    try:
+        loop.run_forever()
+    finally:
+        loop.close()
+    # Non-zero only when the socket server died on its own. A clean SIGTERM
+    # leaves this unset, so `systemctl --user stop` still exits 0 and does
+    # not trip Restart=on-failure.
+    return 1 if holder.get("failed") else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
