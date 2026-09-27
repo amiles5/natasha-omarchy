@@ -71,3 +71,8 @@ o.bind("SUPER + SHIFT + A", "Agent", { launch = "kitty --class milesj.agent -e c
 -- forwards to the already-running instance and raises it instead of
 -- opening a duplicate, so this key doubles as a toggle/summon.
 o.bind("SUPER + SHIFT + T", "Task Manager", { launch = "/home/milesj/Applications/TaskManagerOG.AppImage" })
+
+-- GNOME-style full-screen app grid (matthewjaybarr.app-grid) - see README
+-- for the plugin's own trackpad-gesture setup. SUPER+ALT+SPACE left on
+-- the stock Apps menu.
+o.bind("SUPER + SHIFT + L", "App grid", "omarchy-shell shell toggle matthewjaybarr.app-grid '{}'")

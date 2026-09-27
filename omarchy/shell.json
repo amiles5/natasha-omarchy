@@ -146,6 +146,9 @@
     {
       "id": "omarchy.keyboard-layout",
       "dockedBy": "ozz1ee.bardock"
+    },
+    {
+      "id": "matthewjaybarr.app-grid"
     }
   ],
   "version": 1
